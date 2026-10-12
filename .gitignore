@@ -1,0 +1,13 @@
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+
+# Local state the plugin writes at runtime
+.workbuddy-auth.json
+.workbuddy-ai-auth.json
+.workbuddy-catalog.json
+.workbuddy-ai-catalog.json
+.workbuddy-probe.json
+.workbuddy-ai-probe.json
+.workbuddy-model-visibility.json
