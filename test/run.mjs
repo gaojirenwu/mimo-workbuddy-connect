@@ -20,8 +20,8 @@ import {
   writeConfig,
 } from "../src/provider.js";
 import { classifyUpstreamError, extractDisplayErrorMessage, prepareChatBody, regionOf } from "../src/upstream.js";
-import { classifyAuthDocument, parseWorkBuddyAuth } from "../src/auth.js";
-import { buildAuthenticatedContextAad, parseWrappedField } from "../src/protection.js";
+import { classifyAuthDocument, parseWorkBuddyAuth, stateDir } from "../src/auth.js";
+import { buildAuthenticatedContextAad, parseWrappedField, electronCandidates } from "../src/protection.js";
 import { RelayServer } from "../src/server.js";
 
 let passed = 0;
@@ -362,6 +362,58 @@ process.stdout.write("\nprovider config\n");
 await test("parseJsonc strips comments and trailing commas but keeps URLs", () => {
   const parsed = JSON.parse(parseJsonc('{\n// c\n"a":1,\n"b":"http://x//y",\n"c":[1,2,],\n}'));
   assert.deepEqual(parsed, { a: 1, b: "http://x//y", c: [1, 2] });
+});
+
+await test("stateDir follows each platform's own convention", () => {
+  // A single Linux-style path everywhere would scatter state somewhere no macOS
+  // or Windows user expects, so the branches are asserted explicitly.
+  const savedHome = process.env.MIMO_WORKBUDDY_HOME;
+  const savedAppData = process.env.APPDATA;
+  const savedXdg = process.env.XDG_STATE_HOME;
+  try {
+    delete process.env.MIMO_WORKBUDDY_HOME;
+    const dir = stateDir();
+    assert.ok(dir.endsWith("mimo-workbuddy-connect"), `unexpected stateDir: ${dir}`);
+    if (process.platform === "win32") {
+      assert.ok(process.env.APPDATA === undefined || dir.startsWith(process.env.APPDATA), "windows uses %APPDATA%");
+    } else if (process.platform === "darwin") {
+      assert.match(dir, /Library[\\/]Application Support[\\/]mimo-workbuddy-connect$/u);
+    } else {
+      assert.match(dir, /[\\/]mimo-workbuddy-connect$/u);
+    }
+
+    // The override always wins and is used verbatim.
+    process.env.MIMO_WORKBUDDY_HOME = process.platform === "win32" ? "C:\\custom" : "/custom";
+    assert.equal(stateDir(), process.env.MIMO_WORKBUDDY_HOME);
+  } finally {
+    for (const [key, value] of [
+      ["MIMO_WORKBUDDY_HOME", savedHome],
+      ["APPDATA", savedAppData],
+      ["XDG_STATE_HOME", savedXdg],
+    ]) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
+await test("electronCandidates honours the override and never invents paths", () => {
+  const saved = process.env.WORKBUDDY_ELECTRON_BIN;
+  try {
+    // An explicit override is returned as-is, even though it does not exist,
+    // because the user may be pointing at an unusual install.
+    process.env.WORKBUDDY_ELECTRON_BIN = "/nonexistent/WorkBuddy";
+    assert.deepEqual(electronCandidates(), ["/nonexistent/WorkBuddy"]);
+
+    // Without an override, only paths that exist are offered.
+    delete process.env.WORKBUDDY_ELECTRON_BIN;
+    for (const candidate of electronCandidates()) {
+      assert.equal(existsSync(candidate), true, `returned a missing path: ${candidate}`);
+    }
+  } finally {
+    if (saved === undefined) delete process.env.WORKBUDDY_ELECTRON_BIN;
+    else process.env.WORKBUDDY_ELECTRON_BIN = saved;
+  }
 });
 
 await test("config dir follows the engine's own resolution order", () => {

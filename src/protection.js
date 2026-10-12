@@ -22,6 +22,7 @@
 import { execFile } from "node:child_process";
 import { createDecipheriv, createHash } from "node:crypto";
 import { existsSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 
 /** The one-line helper: print the sealed payload, nothing else. */
@@ -135,18 +136,39 @@ export function openAuthField(key, envelope) {
  * The international build has no verified default, so only the override and
  * registry discovery are offered for it.
  */
+/**
+ * The Electron binary to run as the key helper.
+ *
+ * Discovered per platform, and only paths that actually exist are returned, so
+ * a missing app is reported as "not found" rather than as a spawn failure. An
+ * explicit `WORKBUDDY_ELECTRON_BIN` always wins and is never filtered, because
+ * the user may be pointing at an unusual install location.
+ *
+ * Verified on Windows (`%LOCALAPPDATA%\Programs\WorkBuddy\WorkBuddy.exe`).
+ * The macOS locations follow the standard bundle layout but are NOT verified
+ * against a real machine — hence both `/Applications` and `~/Applications`, and
+ * the env override for anything else.
+ */
 export function electronCandidates() {
-  const candidates = [];
   const override = process.env["WORKBUDDY_ELECTRON_BIN"]?.trim();
-  if (override) candidates.push(override);
+  if (override) return [override];
 
+  const home = homedir();
   if (process.platform === "win32") {
     const local = process.env["LOCALAPPDATA"]?.trim();
+    const candidates = [];
     if (local) candidates.push(join(local, "Programs", "WorkBuddy", "WorkBuddy.exe"));
-  } else if (process.platform === "darwin") {
-    candidates.push("/Applications/WorkBuddy.app/Contents/MacOS/WorkBuddy");
+    return candidates.filter((path) => existsSync(path));
   }
-  return candidates.filter((path) => existsSync(path));
+
+  if (process.platform === "darwin") {
+    return [
+      join("/Applications", "WorkBuddy.app", "Contents", "MacOS", "WorkBuddy"),
+      join(home, "Applications", "WorkBuddy.app", "Contents", "MacOS", "WorkBuddy"),
+    ].filter((path) => existsSync(path));
+  }
+
+  return [];
 }
 
 /** Spawn the app binary as Node and read the sealed payload. */
@@ -158,7 +180,10 @@ function spawnHelper(electronPath, timeoutMs) {
       {
         timeout: timeoutMs,
         maxBuffer: 1 << 20,
-        windowsHide: true,
+        // Windows-only, and ignored elsewhere. Launching the real app briefly is
+        // unavoidable here: the key lives in its private binding, which only the
+        // app's own binary can reach.
+        windowsHide: process.platform === "win32",
         env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
       },
       (error, stdout) => {

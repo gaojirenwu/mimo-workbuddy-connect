@@ -1,12 +1,14 @@
 {
   "name": "mimo-workbuddy-connect",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "把 WorkBuddy 桌面 App 的模型接入小米 MiMo Desktop（MiMoCode）— bring WorkBuddy desktop models into Xiaomi MiMo Desktop with zero configuration.",
   "keywords": [
     "mimocode",
     "mimo-desktop",
+    "xiaomi-mimo",
     "workbuddy",
     "model-provider",
+    "openai-compatible",
     "opencode"
   ],
   "type": "module",
@@ -30,7 +32,9 @@
   },
   "files": [
     "src",
+    "scripts",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "scripts": {
@@ -38,6 +42,7 @@
     "install-provider": "node src/cli.js install",
     "uninstall-provider": "node src/cli.js uninstall",
     "serve": "node src/cli.js serve",
+    "setup": "node scripts/install.mjs",
     "test": "node test/run.mjs"
   }
 }

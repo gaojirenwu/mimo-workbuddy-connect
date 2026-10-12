@@ -281,15 +281,28 @@ export function readWorkBuddyCredential(variant) {
   };
 }
 
-/** Directory holding the plugin's own state, separate from the app's files. */
+/**
+ * Directory holding the plugin's own state, separate from the app's files.
+ *
+ * Per-platform, because the conventions genuinely differ: macOS uses
+ * `~/Library/Application Support`, Windows `%APPDATA%`, and Linux the XDG state
+ * home. Using the Linux path everywhere would scatter files in a location no
+ * macOS user expects (and that nothing else on the system looks at).
+ */
 export function stateDir() {
   const base = process.env["MIMO_WORKBUDDY_HOME"]?.trim();
   if (base) return base;
-  const appData =
-    process.env["APPDATA"] ||
-    process.env["XDG_STATE_HOME"] ||
-    join(homedir(), ".local", "state");
-  return join(appData, "mimo-workbuddy-connect");
+
+  const home = homedir();
+  if (process.platform === "darwin") {
+    return join(home, "Library", "Application Support", "mimo-workbuddy-connect");
+  }
+  if (process.platform === "win32") {
+    const appData = process.env["APPDATA"]?.trim() || join(home, "AppData", "Roaming");
+    return join(appData, "mimo-workbuddy-connect");
+  }
+  const stateHome = process.env["XDG_STATE_HOME"]?.trim() || join(home, ".local", "state");
+  return join(stateHome, "mimo-workbuddy-connect");
 }
 
 /** Path of one plugin-owned state file. */

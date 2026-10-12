@@ -38,7 +38,18 @@ https://copilot.tencent.com/v2/chat/completions
 
 ## 快速开始
 
-前置：Windows，已安装并**登录** WorkBuddy 桌面 App；Node.js ≥ 22.19 或 ≥ 24。
+前置：已安装并**登录** WorkBuddy 桌面 App；Node.js ≥ 22.19 或 ≥ 24。
+
+### 跨平台（Windows / macOS / Linux）
+
+```bash
+node scripts/install.mjs
+```
+
+自动完成后台自启：Windows 用注册表 Run 键，macOS 用 launchd，Linux 用 systemd user unit。
+不想要自启就加 `--no-autostart`；卸载用 `--uninstall`。
+
+### Windows 一键脚本
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\install.ps1
@@ -142,7 +153,7 @@ node src\cli.js serve       # 前台运行中继
 单元与离线集成测试（**不需要任何账号或密钥**，可直接上 CI）：
 
 ```powershell
-node test\run.mjs      # 55 passed, 0 failed
+node test\run.mjs      # 57 passed, 0 failed
 ```
 
 需要本机已登录 WorkBuddy 的手工验证脚本在 `test\manual\`（会真实发请求、消耗额度，CI 里不要跑）：
@@ -301,9 +312,35 @@ node src\cli.js install --probe-efforts
 
 ---
 
+## 平台支持
+
+| 平台 | 状态 | 说明 |
+|---|---|---|
+| **Windows** | ✅ **已实机验证** | 开发与验证平台：凭据解密、目录、流式、工具、视觉、档位全部实测通过 |
+| **macOS** | ⚠️ **代码已适配，但未实机验证** | 代码里所有平台分支都已就位（见下），但没有 Mac 机器跑过 |
+| **Linux** | ⚠️ 同上 | 且 MiMo Desktop 本身是否有 Linux 版需自行确认 |
+
+**macOS 上已处理的部分**（代码层面）：
+
+- 凭据路径：`~/Library/Application Support/CodeBuddyExtension/Data/Public/auth/`
+- WorkBuddy 可执行文件：`/Applications/WorkBuddy.app/Contents/MacOS/WorkBuddy`
+  （以及 `~/Applications`；都找不到时用 `WORKBUDDY_ELECTRON_BIN` 指定）
+- 插件状态目录：`~/Library/Application Support/mimo-workbuddy-connect`
+- 自启：launchd agent（`~/Library/LaunchAgents/`）
+
+**但请注意**：macOS 的凭据**加密密钥获取方式与 Windows 完全不同**
+（Windows 走 DPAPI，macOS 走 Keychain）。本项目的解密模块是按 WorkBuddy 自身
+Electron 的私有绑定实现的，**这一环在 macOS 上能否直接work没有验证过**。
+`doctor` 会明确报出失败在哪一步，便于定位。
+
+如果你在 Mac 上跑通了（或跑不通），欢迎提 issue 反馈实际结果。
+
+---
+
 ## 已知限制
 
 - 上游依赖 WorkBuddy 客户端接口（非公开 API），WorkBuddy 更新后可能需要跟进。
+- **macOS / Linux 未经实机验证**（Windows 已完整验证），见上表。
 - 国际版（WorkBuddy AI）的 auth 路径与 Electron 位置未经实机验证，必要时用环境变量指定。
 - 加密凭据解密依赖 WorkBuddy 自身 Electron 的私有绑定；若上游更换实现，需重新对齐（`doctor` 会明确报出是哪一步失败）。
 - Desktop 上的 provider 配置**需要重启 MiMo Desktop 生效**（官方 `provider-local-refresh` 说明：静态配置变更需显式重启）。
